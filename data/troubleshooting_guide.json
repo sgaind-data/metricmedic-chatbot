@@ -1,0 +1,52 @@
+[
+  {
+    "issue": "Dashboard total is higher than the source system",
+    "keywords": "dashboard total higher revenue mismatch source system duplicate rows join",
+    "response": "Check for duplicate rows and one-to-many or many-to-many joins. Then compare filters, date ranges, and aggregation logic between the dashboard and source system."
+  },
+  {
+    "issue": "Duplicate records",
+    "keywords": "duplicate duplicates repeated rows records double counting",
+    "response": "Identify the expected unique key and check whether it appears more than once. Review joins because one-to-many relationships can multiply records."
+  },
+  {
+    "issue": "Incorrect SQL join",
+    "keywords": "join incorrect sql many to many one to many duplicate rows",
+    "response": "Validate the join keys and the relationship between tables. Compare row counts before and after the join."
+  },
+  {
+    "issue": "NULL values affecting calculations",
+    "keywords": "null missing values blank calculation sql dashboard",
+    "response": "Check how NULL values are handled in calculations and filters. Confirm what NULL represents before replacing it with a default value."
+  },
+  {
+    "issue": "COUNT and COUNT DISTINCT mismatch",
+    "keywords": "count distinct customers records different count duplicate",
+    "response": "Compare COUNT(*) with COUNT(DISTINCT identifier). A difference may indicate duplicate rows or one-to-many joins."
+  },
+  {
+    "issue": "Different date filters",
+    "keywords": "date filter date range different periods dashboard sql",
+    "response": "Confirm both reports use the same date field, date range, timezone, and inclusion rules."
+  },
+  {
+    "issue": "Dashboard has stale data",
+    "keywords": "dashboard stale old data refresh latest update",
+    "response": "Check the last refresh timestamp and verify whether the ETL pipeline or scheduled refresh completed successfully."
+  },
+  {
+    "issue": "Revenue does not match finance report",
+    "keywords": "revenue finance mismatch amount dashboard financial report",
+    "response": "Confirm both teams use the same revenue definition and check refunds, cancelled transactions, discounts, pending payments, and recognized revenue."
+  },
+  {
+    "issue": "Power BI dashboard mismatch",
+    "keywords": "power bi dax dashboard mismatch incorrect total",
+    "response": "Review Power BI filters, relationships, DAX measures, and aggregation context. Compare the underlying rows with the source SQL."
+  },
+  {
+    "issue": "KPI definition mismatch",
+    "keywords": "kpi definition different teams metric mismatch business definition",
+    "response": "Document the KPI formula, population, exclusions, date logic, and aggregation method, then confirm the definition with the business owner."
+  }
+]
