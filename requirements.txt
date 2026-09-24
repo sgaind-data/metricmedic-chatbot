@@ -1,2 +1,2 @@
-scikit-learn
-pytest
+scikit-learn==1.5.1
+pytest==9.0.3
