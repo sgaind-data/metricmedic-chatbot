@@ -200,7 +200,7 @@ pytest
 The test suite checks:
 
 - chatbot initialization
-- knowledge-base loading
+- chatbot initialization and knowledge-base availability
 - Power BI issue matching
 - empty input handling
 - unrelated-question fallback behavior
