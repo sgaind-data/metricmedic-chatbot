@@ -1,51 +1,121 @@
-# MetricMedic Chatbot
+# MetricMedic 🩺📊
 
-MetricMedic is a lightweight retrieval-based chatbot designed for students and junior data analysts who encounter inconsistent metrics across SQL queries, dashboards, and business reports.
+MetricMedic is a RAG-powered troubleshooting assistant designed for students and junior data analysts who encounter mismatched metrics across SQL queries, dashboards, ETL pipelines, KPIs, and business reports.
 
-It uses TF-IDF vectorization and cosine similarity to match a user's question with the most relevant troubleshooting scenario and returns practical diagnostic steps through an interactive Streamlit chat interface.
+It combines semantic embeddings, FAISS vector search, a structured analytics knowledge base, and Gemini to retrieve relevant troubleshooting context and generate grounded diagnostic guidance through an interactive Streamlit chat interface.
 
 ## Features
 
-- Troubleshoots SQL, dashboard, KPI, and data-quality issues
-- Supports common problems such as:
-  - duplicate records
-  - incorrect joins
-  - NULL handling
-  - filter mismatches
-  - stale dashboard data
-  - revenue discrepancies
-  - KPI definition differences
-- Retrieval-based NLP using TF-IDF and cosine similarity
-- JSON troubleshooting knowledge base
-- Interactive Streamlit chat interface
-- Command-line interface
-- Low-confidence fallback for unrelated questions
-- Automated tests with pytest
-- No API key required
+- Natural-language troubleshooting for SQL, dashboards, KPIs, ETL, and data-quality issues
+- Semantic retrieval using Sentence Transformers
+- FAISS vector similarity search
+- Gemini-powered grounded response generation
+- Structured JSON troubleshooting knowledge base
+- Retrieval transparency with similarity scores
+- Persistent chat history using SQLite
+- New Chat and previous-chat navigation
+- Automatic chat titles
+- Delete saved conversations
+- Fallback response if Gemini is temporarily unavailable
+- Automated retrieval tests with pytest
+- Streamlit conversational interface
 
 ## Tech Stack
 
 - Python
-- scikit-learn
 - Streamlit
-- pytest
+- Sentence Transformers
+- FAISS
+- Google Gemini
+- SQLite
 - JSON
+- pytest
+
+## Architecture
+
+```text
+User Question
+      ↓
+SentenceTransformer Embedding
+      ↓
+FAISS Vector Search
+      ↓
+Top-K Troubleshooting Context
+      ↓
+Grounded Prompt
+      ↓
+Gemini
+      ↓
+Generated Troubleshooting Answer
+```
+
+If Gemini is temporarily unavailable, MetricMedic falls back to a deterministic response based on the retrieved troubleshooting context.
 
 ## Project Structure
 
 ```text
 metricmedic-chatbot/
 ├── app.py
-├── chatbot.py
+├── chat_store.py
+├── llm.py
+├── rag.py
+├── rag_chatbot.py
 ├── data/
 │   └── troubleshooting_guide.json
 ├── tests/
-│   └── test_chatbot.py
-├── README.md
-├── requirements.txt
+│   └── test_rag.py
+├── .env.example
 ├── .gitignore
-└── LICENSE
+├── LICENSE
+├── README.md
+└── requirements.txt
 ```
+
+## How It Works
+
+### 1. Semantic Retrieval
+
+MetricMedic loads troubleshooting scenarios from:
+
+```text
+data/troubleshooting_guide.json
+```
+
+Each scenario contains an issue description, keywords, and recommended diagnostic guidance.
+
+The content is converted into semantic embeddings using a Sentence Transformer model.
+
+### 2. FAISS Vector Search
+
+The user's question is embedded using the same model.
+
+FAISS compares the query embedding with the troubleshooting knowledge base and retrieves the most relevant scenarios using vector similarity.
+
+### 3. Retrieval-Augmented Generation
+
+The top retrieved scenarios are passed to Gemini as grounded context.
+
+Gemini generates a concise response containing:
+
+- the likely issue
+- recommended diagnostic checks
+- an explanation of why the issue may be happening
+
+The model is instructed to rely on the retrieved troubleshooting context rather than inventing unsupported details.
+
+### 4. Persistent Chat History
+
+MetricMedic stores conversations locally using SQLite.
+
+Users can:
+
+- start a new chat
+- reopen previous conversations
+- maintain chat history between sessions
+- automatically title conversations from the first question
+- delete saved chats
+
+The local database is excluded from GitHub.
 
 ## Prerequisites
 
@@ -54,12 +124,7 @@ Before running MetricMedic, make sure you have:
 - Python 3.10 or later
 - pip
 - Git
-
-Check your Python version:
-
-```bash
-python3 --version
-```
+- Gemini API key
 
 ## Installation
 
@@ -88,142 +153,145 @@ Install the required dependencies:
 pip install -r requirements.txt
 ```
 
-## Run the Streamlit Chatbot
+## Configure Gemini
 
-Start the interactive web interface with:
+A template environment file is included:
+
+```text
+.env.example
+```
+
+Create your own `.env` file in the project root:
+
+```text
+GEMINI_API_KEY=your_actual_gemini_api_key
+```
+
+Do not commit your `.env` file or API key to GitHub.
+
+## Run MetricMedic
+
+Start the Streamlit application:
 
 ```bash
 streamlit run app.py
 ```
 
-Streamlit will usually open the application in your browser at:
+The application usually opens at:
 
 ```text
 http://localhost:8501
 ```
 
-Example question:
+## Example Questions
+
+Try prompts such as:
 
 ```text
-My dashboard customer count doubled after I joined two tables.
+My dashboard customer count doubled after joining two tables.
 ```
-
-Example response:
 
 ```text
-Possible issue: COUNT and COUNT DISTINCT mismatch
-
-Recommended checks:
-Compare COUNT(*) with COUNT(DISTINCT identifier).
-A difference may indicate duplicate rows or one-to-many joins.
+Finance says revenue is different from Power BI.
 ```
-
-## Run the Command-Line Version
-
-MetricMedic can also be used directly from the terminal:
-
-```bash
-python chatbot.py
-```
-
-Example:
 
 ```text
-You: My Power BI dashboard shows more revenue than my SQL query
-
-MetricMedic:
-Possible issue: Power BI dashboard mismatch
-
-Recommended checks:
-Review Power BI filters, relationships, DAX measures, and aggregation context.
-Compare the underlying rows with the source SQL.
+My dashboard is still showing yesterday's data.
 ```
-
-Type `exit`, `quit`, or `bye` to close the chatbot.
-
-## How It Works
-
-MetricMedic follows a lightweight retrieval-based NLP workflow:
 
 ```text
-User Question
-      ↓
-TF-IDF Vectorization
-      ↓
-Cosine Similarity
-      ↓
-Closest Troubleshooting Scenario
-      ↓
-Recommended Diagnostic Steps
+Why did records disappear after an INNER JOIN?
 ```
-
-Troubleshooting scenarios are stored in:
 
 ```text
-data/troubleshooting_guide.json
+My conversion rate is above 100%.
 ```
-
-The chatbot converts the stored troubleshooting scenarios and the user's question into TF-IDF vectors using scikit-learn.
-
-Cosine similarity compares the user's question against the knowledge base and retrieves the closest matching troubleshooting issue.
-
-If the similarity score is too low, MetricMedic returns a fallback response instead of presenting an unrelated recommendation.
-
-## Knowledge Base
-
-The JSON knowledge base contains troubleshooting scenarios related to:
-
-- duplicate records
-- incorrect SQL joins
-- NULL values
-- COUNT vs. COUNT DISTINCT
-- date-filter mismatches
-- stale dashboard data
-- revenue mismatches
-- Power BI reporting issues
-- KPI definition inconsistencies
-
-The knowledge base can be expanded by adding additional entries to:
 
 ```text
-data/troubleshooting_guide.json
+My historical dashboard numbers changed from last month.
 ```
+
+## Example Retrieval Flow
+
+For a question such as:
+
+```text
+My dashboard customer count doubled after joining two tables.
+```
+
+MetricMedic may retrieve scenarios related to:
+
+```text
+Dashboard total is higher than the source system
+COUNT and COUNT DISTINCT mismatch
+Many-to-many join causing row explosion
+```
+
+Gemini then combines the retrieved troubleshooting context into a grounded response.
+
+Users can expand the **Retrieved troubleshooting context** section in the interface to inspect the supporting issues and similarity scores.
 
 ## Testing
 
-Run the automated tests with:
+Run the automated test suite with:
 
 ```bash
 pytest
 ```
 
-The test suite checks:
+The tests validate:
 
-- chatbot initialization
-- chatbot initialization and knowledge-base availability
-- Power BI issue matching
-- empty input handling
-- unrelated-question fallback behavior
+- knowledge-base loading
+- FAISS index creation
+- semantic retrieval
+- join-problem retrieval
+- stale-dashboard retrieval
+- revenue-mismatch retrieval
 
-Expected result:
+Gemini is not called during unit tests, which keeps the tests deterministic and avoids failures caused by temporary API availability.
+
+## Knowledge Base Coverage
+
+MetricMedic includes troubleshooting scenarios related to:
+
+- duplicate records
+- SQL joins
+- NULL handling
+- COUNT vs. COUNT DISTINCT
+- date filters
+- stale dashboards
+- Power BI DAX context
+- revenue reconciliation
+- ETL failures
+- incremental loads
+- late-arriving data
+- KPI definitions
+- aggregation grain
+- row-level security
+- currency conversion
+- historical data changes
+- slowly changing dimensions
+- fact and dimension table issues
+
+New troubleshooting scenarios can be added directly to:
 
 ```text
-4 passed
+data/troubleshooting_guide.json
 ```
 
-## Dependencies
+## Security
 
-The project uses:
+Sensitive or local-only files are excluded using `.gitignore`, including:
 
 ```text
-scikit-learn==1.5.1
-pytest==9.0.3
-streamlit
+.env
+metricmedic_chats.db
+.venv/
+__pycache__/
+.pytest_cache/
 ```
 
-- **scikit-learn** — TF-IDF vectorization and cosine similarity
-- **pytest** — automated testing
-- **Streamlit** — browser-based chatbot interface
+The repository includes `.env.example` so other users know which environment variable is required without exposing the real Gemini API key.
 
 ## License
 

@@ -48,5 +48,210 @@
     "issue": "KPI definition mismatch",
     "keywords": "kpi definition different teams metric mismatch business definition",
     "response": "Document the KPI formula, population, exclusions, date logic, and aggregation method, then confirm the definition with the business owner."
+  },
+  {
+    "issue": "Inner join dropping records",
+    "keywords": "inner join missing rows dropped records sql join unmatched",
+    "response": "Check whether unmatched records are being removed by an INNER JOIN. Test the logic with a LEFT JOIN and inspect the unmatched keys."
+  },
+  {
+    "issue": "Many-to-many join causing row explosion",
+    "keywords": "many to many join row explosion too many rows multiplied records duplicate",
+    "response": "Check whether both tables contain multiple rows for the join key. Aggregate or deduplicate one side before joining if a many-to-many relationship is not intended."
+  },
+  {
+    "issue": "Unexpected drop in dashboard values",
+    "keywords": "dashboard dropped lower missing data sudden decline values decrease",
+    "response": "Compare refresh times, source row counts, filters, and ETL job status. A sudden drop may indicate missing source data or an incomplete pipeline load."
+  },
+  {
+    "issue": "Timezone mismatch",
+    "keywords": "timezone time zone utc local date mismatch dashboard sql",
+    "response": "Check whether one system uses UTC while another uses local time. Convert timestamps consistently before comparing daily or hourly metrics."
+  },
+  {
+    "issue": "Aggregation grain mismatch",
+    "keywords": "aggregation grain level daily monthly customer transaction total mismatch",
+    "response": "Confirm both reports aggregate at the same level of detail. Comparing customer-level data with transaction-level or monthly data can produce different totals."
+  },
+  {
+    "issue": "Incorrect average calculation",
+    "keywords": "average avg wrong weighted average calculation denominator dashboard sql",
+    "response": "Check whether the metric requires a simple average or weighted average. Also verify whether duplicate rows are influencing the denominator."
+  },
+  {
+    "issue": "Missing records caused by NULL join keys",
+    "keywords": "null join key missing records unmatched rows sql join",
+    "response": "Inspect join columns for NULL values. Records with NULL join keys may fail to match and disappear depending on the join logic."
+  },
+  {
+    "issue": "Data type mismatch",
+    "keywords": "data type mismatch string integer varchar numeric join comparison sql",
+    "response": "Check whether compared or joined fields use compatible data types. Cast values consistently before joining or filtering."
+  },
+  {
+    "issue": "Whitespace causing join mismatch",
+    "keywords": "leading trailing spaces whitespace string mismatch join key text",
+    "response": "Check text fields for leading or trailing whitespace. Trim values before joining or comparing them."
+  },
+  {
+    "issue": "Case sensitivity mismatch",
+    "keywords": "uppercase lowercase case sensitive mismatch string sql join",
+    "response": "Normalize text values using UPPER() or LOWER() before comparison if the systems handle case differently."
+  },
+  {
+    "issue": "Duplicate source transactions",
+    "keywords": "duplicate transaction repeated id source ingestion double revenue",
+    "response": "Check whether transaction IDs are unique and whether records were reloaded or appended more than once during ingestion."
+  },
+  {
+    "issue": "Cancelled orders included in revenue",
+    "keywords": "cancelled canceled refunded orders revenue total completed status",
+    "response": "Confirm whether cancelled, refunded, or incomplete orders should be excluded from the revenue calculation."
+  },
+  {
+    "issue": "Currency conversion mismatch",
+    "keywords": "currency exchange rate usd eur conversion revenue mismatch",
+    "response": "Verify that both reports use the same exchange rate, conversion date, source currency, and rounding rules."
+  },
+  {
+    "issue": "Rounding differences",
+    "keywords": "rounding decimal precision cents small difference total mismatch",
+    "response": "Check whether values are rounded before or after aggregation. Different decimal precision can create small reporting differences."
+  },
+  {
+    "issue": "Hidden dashboard filter",
+    "keywords": "dashboard hidden filter report level page level visual filter mismatch",
+    "response": "Review report-level, page-level, and visual-level filters. A hidden filter may exclude records that remain present in the source query."
+  },
+  {
+    "issue": "Row-level security affecting totals",
+    "keywords": "row level security rls power bi permissions different totals users",
+    "response": "Check whether row-level security is filtering data differently for different users or roles."
+  },
+  {
+    "issue": "DAX filter context issue",
+    "keywords": "dax filter context calculate all filter power bi measure incorrect",
+    "response": "Review the measure's filter context and any CALCULATE, ALL, or FILTER logic that may be changing the visible data context."
+  },
+  {
+    "issue": "ETL pipeline loaded incomplete data",
+    "keywords": "etl incomplete load missing rows pipeline failed partial data",
+    "response": "Check ETL job logs, source-to-target row counts, failed tasks, and whether every extraction and transformation step completed successfully."
+  },
+  {
+    "issue": "Incremental load missed records",
+    "keywords": "incremental load missing records watermark timestamp etl cutoff",
+    "response": "Verify the incremental-load watermark or timestamp condition. Late-arriving or delayed records may be excluded if the cutoff logic is incorrect."
+  },
+  {
+    "issue": "Late-arriving data",
+    "keywords": "late arriving delayed records reporting cutoff yesterday today source",
+    "response": "Check whether records arrived after the reporting cutoff. Determine whether the dashboard should support late-arriving updates or backfills."
+  },
+  {
+    "issue": "Wrong KPI denominator",
+    "keywords": "wrong denominator rate percentage kpi conversion rate metric",
+    "response": "Validate the denominator separately from the numerator and confirm that both use the same population, filters, and reporting period."
+  },
+  {
+    "issue": "Percentage above 100 percent",
+    "keywords": "percentage over 100 greater than 100 rate dashboard kpi",
+    "response": "Check for duplicate numerator records, overlapping categories, or a denominator that is filtered more narrowly than the numerator."
+  },
+  {
+    "issue": "Historical data changed unexpectedly",
+    "keywords": "historical data changed prior month numbers changed dashboard",
+    "response": "Check whether source data is being updated retrospectively, business logic changed, or slowly changing dimensions altered historical results."
+  },
+  {
+    "issue": "Dimension key mismatch",
+    "keywords": "dimension key surrogate key missing lookup warehouse unknown member",
+    "response": "Check whether fact records match the expected dimension keys and whether missing dimension members are being handled correctly."
+  },
+  {
+    "issue": "Fact table grain duplication",
+    "keywords": "fact table duplicate grain warehouse repeated records key combination",
+    "response": "Identify the intended grain of the fact table and verify that each key combination appears only once at that grain."
+  },
+  {
+    "issue": "Duplicate records after UNION",
+    "keywords": "union union all duplicate repeated rows sql merge datasets",
+    "response": "Check whether UNION ALL is preserving duplicate rows when UNION is expected, or whether the source datasets already contain overlapping records."
+  },
+  {
+    "issue": "Incorrect GROUP BY logic",
+    "keywords": "group by aggregation wrong total sql grouped columns",
+    "response": "Review the GROUP BY columns and make sure they match the intended reporting grain. Extra grouping columns can split totals unexpectedly."
+  },
+  {
+    "issue": "HAVING filter removes expected groups",
+    "keywords": "having filter group by missing groups sql aggregation",
+    "response": "Check whether the HAVING clause is filtering out aggregated groups that should remain in the result."
+  },
+  {
+    "issue": "WHERE clause excludes valid rows",
+    "keywords": "where filter excludes rows missing data sql conditions",
+    "response": "Review the WHERE conditions carefully and test each filter independently to identify which condition removes expected records."
+  },
+  {
+    "issue": "Date boundary off by one day",
+    "keywords": "off by one day date boundary midnight timestamp inclusive exclusive",
+    "response": "Check whether date ranges use inclusive or exclusive boundaries and whether timestamps around midnight are being interpreted consistently."
+  },
+  {
+    "issue": "Fiscal calendar mismatch",
+    "keywords": "fiscal calendar calendar year quarter month mismatch reporting",
+    "response": "Confirm whether both reports use the same fiscal calendar, quarter definitions, and period boundaries."
+  },
+  {
+    "issue": "Distinct count changes across visuals",
+    "keywords": "distinct count changes visual power bi tableau filters context",
+    "response": "Check whether different visuals apply different filter context or dimensions that alter the distinct-count population."
+  },
+  {
+    "issue": "Dashboard uses cached extract",
+    "keywords": "cached extract tableau old data dashboard refresh stale",
+    "response": "Check whether the dashboard is using a cached extract instead of a live connection and confirm the extract refresh schedule."
+  },
+  {
+    "issue": "Source and dashboard use different status logic",
+    "keywords": "status logic active completed pending cancelled mismatch dashboard sql",
+    "response": "Compare the status filters and business rules used by both systems. Different definitions of active, completed, pending, or cancelled can change totals."
+  },
+  {
+    "issue": "Snapshot versus transactional data mismatch",
+    "keywords": "snapshot transaction transactional daily snapshot mismatch report",
+    "response": "Check whether one report uses a point-in-time snapshot while another uses all transactions over a period. These approaches can produce different totals."
+  },
+  {
+    "issue": "Slowly changing dimension affects history",
+    "keywords": "slowly changing dimension scd type 2 historical attribute duplicate",
+    "response": "Check whether multiple dimension versions are joining to the same fact record. Apply effective-date logic when using Type 2 slowly changing dimensions."
+  },
+  {
+    "issue": "Duplicate dimension values",
+    "keywords": "dimension duplicate values duplicate key lookup join multiplication",
+    "response": "Verify that the dimension key is unique. Duplicate dimension rows can multiply fact records during joins."
+  },
+  {
+    "issue": "Missing foreign key relationships",
+    "keywords": "missing foreign key orphan records warehouse unmatched dimension",
+    "response": "Check for fact records whose foreign keys do not match dimension records and decide how unknown members should be handled."
+  },
+  {
+    "issue": "Incorrect window function partition",
+    "keywords": "window function partition by row_number rank duplicate sql",
+    "response": "Review the PARTITION BY and ORDER BY columns in your window function. Incorrect partitioning can create unexpected rankings or duplicate selections."
+  },
+  {
+    "issue": "Latest record logic is wrong",
+    "keywords": "latest record max date row_number most recent duplicate sql",
+    "response": "Use a reliable ordering column such as timestamp plus a tie-breaker and validate that the latest record logic returns only one row per entity."
+  },
+  {
+    "issue": "Metric uses different source tables",
+    "keywords": "different source tables data source mismatch metric dashboard report",
+    "response": "Confirm that both reports derive the metric from the same source tables or from sources with equivalent business logic."
   }
 ]
