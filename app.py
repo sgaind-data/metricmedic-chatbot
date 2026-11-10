@@ -1,7 +1,13 @@
+import logging
+
 import streamlit as st
 
 from chat_store import ChatStore
-from rag_chatbot import MetricMedicRAG
+from metricmedic import MetricMedicRAG
+from metricmedic.logging_config import setup_logging
+
+setup_logging()
+logger = logging.getLogger("metricmedic.app")
 
 
 st.set_page_config(
@@ -101,7 +107,7 @@ with st.sidebar:
     if not chats:
         st.caption("No previous conversations yet.")
 
-    for chat_id, title, created_at, updated_at in chats:
+    for chat_id, title, _created_at, _updated_at in chats:
         col1, col2 = st.columns([5, 1])
 
         with col1:
@@ -119,9 +125,7 @@ with st.sidebar:
                 key=f"delete_{chat_id}",
                 help="Delete chat",
             ):
-                deleting_active_chat = (
-                    chat_id == st.session_state.active_chat_id
-                )
+                deleting_active_chat = chat_id == st.session_state.active_chat_id
 
                 chat_store.delete_chat(chat_id)
 
@@ -129,9 +133,7 @@ with st.sidebar:
 
                 if deleting_active_chat:
                     if remaining_chats:
-                        st.session_state.active_chat_id = (
-                            remaining_chats[0][0]
-                        )
+                        st.session_state.active_chat_id = remaining_chats[0][0]
                     else:
                         new_chat_id = chat_store.create_chat()
 
@@ -158,8 +160,7 @@ with st.sidebar:
 st.title("🩺 MetricMedic")
 
 st.caption(
-    "RAG-powered troubleshooting assistant for SQL, dashboards, "
-    "KPIs, ETL, and data-quality issues."
+    "RAG-powered troubleshooting assistant for SQL, dashboards, KPIs, ETL, and data-quality issues."
 )
 
 active_chat_id = st.session_state.active_chat_id
@@ -175,9 +176,7 @@ for message in messages:
 # User input
 # -------------------------------------------------------------------
 
-user_input = st.chat_input(
-    "Describe your SQL, dashboard, KPI, ETL, or data-quality issue..."
-)
+user_input = st.chat_input("Describe your SQL, dashboard, KPI, ETL, or data-quality issue...")
 
 if user_input:
     existing_messages = chat_store.get_messages(active_chat_id)
@@ -190,11 +189,7 @@ if user_input:
     )
 
     # Automatically rename a new conversation using the first user prompt.
-    user_message_count = sum(
-        1
-        for message in existing_messages
-        if message["role"] == "user"
-    )
+    user_message_count = sum(1 for message in existing_messages if message["role"] == "user")
 
     if user_message_count == 0:
         chat_store.update_chat_title(
@@ -206,16 +201,14 @@ if user_input:
         st.markdown(user_input)
 
     with st.chat_message("assistant"):
-        with st.spinner(
-            "Retrieving relevant context and analyzing your issue..."
-        ):
+        with st.spinner("Retrieving relevant context and analyzing your issue..."):
             try:
                 result = chatbot.answer(user_input)
 
                 answer = result["answer"]
                 sources = result["sources"]
 
-            except Exception as error:
+            except Exception:
                 answer = (
                     "I encountered an unexpected error while analyzing "
                     "your issue. Please try again."
@@ -223,30 +216,21 @@ if user_input:
 
                 sources = []
 
-                print(f"MetricMedic error: {error}")
+                logger.exception("Unexpected error while answering")
 
         st.markdown(answer)
 
         if sources:
-            with st.expander(
-                "🔎 Retrieved troubleshooting context"
-            ):
+            with st.expander("🔎 Retrieved troubleshooting context"):
                 for index, source in enumerate(
                     sources,
                     start=1,
                 ):
-                    st.markdown(
-                        f"### {index}. {source['issue']}"
-                    )
+                    st.markdown(f"### {index}. {source['issue']}")
 
-                    st.markdown(
-                        f"**Similarity score:** "
-                        f"`{source['score']:.3f}`"
-                    )
+                    st.markdown(f"**Similarity score:** `{source['score']:.3f}`")
 
-                    st.markdown(
-                        f"**Guidance:** {source['response']}"
-                    )
+                    st.markdown(f"**Guidance:** {source['response']}")
 
                     if index < len(sources):
                         st.divider()

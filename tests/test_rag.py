@@ -1,22 +1,23 @@
-import sys
-from pathlib import Path
+"""Retrieval tests for the MetricMedic FAISS retriever. No Gemini calls."""
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
+import pytest
 
-from rag import MetricMedicRetriever
+from metricmedic import MetricMedicRetriever
 
 
-def test_retriever_initialization():
-    retriever = MetricMedicRetriever()
+@pytest.fixture(scope="module")
+def retriever():
+    """Load the embedding model and FAISS index once for all tests in this file."""
+    return MetricMedicRetriever()
 
+
+def test_retriever_initialization(retriever):
     assert retriever.knowledge_base
     assert len(retriever.knowledge_base) > 0
     assert retriever.index.ntotal == len(retriever.knowledge_base)
 
 
-def test_retrieve_returns_results():
-    retriever = MetricMedicRetriever()
-
+def test_retrieve_returns_results(retriever):
     results = retriever.retrieve(
         "My dashboard customer count doubled after joining two tables",
         top_k=3,
@@ -28,62 +29,39 @@ def test_retrieve_returns_results():
     assert "response" in results[0]
 
 
-def test_join_problem_retrieval():
-    retriever = MetricMedicRetriever()
-
+def test_join_problem_retrieval(retriever):
     results = retriever.retrieve(
         "My row count exploded after joining two tables",
         top_k=3,
     )
 
-    retrieved_issues = [
-        result["issue"].lower()
-        for result in results
-    ]
+    retrieved_issues = [result["issue"].lower() for result in results]
 
     assert any(
-        "join" in issue
-        or "duplicate" in issue
-        or "row explosion" in issue
+        "join" in issue or "duplicate" in issue or "row explosion" in issue
         for issue in retrieved_issues
     )
 
 
-def test_stale_dashboard_retrieval():
-    retriever = MetricMedicRetriever()
-
+def test_stale_dashboard_retrieval(retriever):
     results = retriever.retrieve(
         "My dashboard is still showing yesterday's data",
         top_k=3,
     )
 
-    retrieved_text = " ".join(
-        result["issue"].lower()
-        for result in results
-    )
+    retrieved_text = " ".join(result["issue"].lower() for result in results)
 
-    assert (
-        "stale" in retrieved_text
-        or "refresh" in retrieved_text
-        or "late" in retrieved_text
-    )
+    assert "stale" in retrieved_text or "refresh" in retrieved_text or "late" in retrieved_text
 
 
-def test_revenue_mismatch_retrieval():
-    retriever = MetricMedicRetriever()
-
+def test_revenue_mismatch_retrieval(retriever):
     results = retriever.retrieve(
         "Finance says revenue is different from my Power BI dashboard",
         top_k=3,
     )
 
-    retrieved_text = " ".join(
-        result["issue"].lower()
-        for result in results
-    )
+    retrieved_text = " ".join(result["issue"].lower() for result in results)
 
     assert (
-        "revenue" in retrieved_text
-        or "power bi" in retrieved_text
-        or "dashboard" in retrieved_text
+        "revenue" in retrieved_text or "power bi" in retrieved_text or "dashboard" in retrieved_text
     )
