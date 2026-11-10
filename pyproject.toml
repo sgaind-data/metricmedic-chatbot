@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metricmedic"
+version = "0.2.0"
+description = "RAG API, tracing & evals for SQL/dashboard/KPI/ETL troubleshooting"
+requires-python = ">=3.10"
+license = "MIT"
+
+[tool.setuptools]
+packages = ["metricmedic"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
