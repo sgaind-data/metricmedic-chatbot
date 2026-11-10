@@ -1,3 +1,6 @@
+# Local development and CI: app + test and code-quality tools.
 -r requirements.txt
+pytest==9.0.3
+httpx
 ruff
 pre-commit

@@ -4,18 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "metricmedic"
-version = "0.2.0"
+version = "0.3.0"
 description = "RAG API, tracing & evals for SQL/dashboard/KPI/ETL troubleshooting"
 requires-python = ">=3.10"
 license = "MIT"
 
-[tool.setuptools]
-packages = ["metricmedic"]
+[tool.setuptools.packages.find]
+include = ["metricmedic*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-
 
 [tool.ruff]
 line-length = 100
@@ -23,3 +22,7 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's Depends() in a default argument is the intended pattern, not a bug.
+extend-immutable-calls = ["fastapi.Depends"]
