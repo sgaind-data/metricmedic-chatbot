@@ -1,0 +1,18 @@
+services:
+  api:
+    build: .
+    image: metricmedic-api:0.3.0
+    container_name: metricmedic-api
+    ports:
+      - "8000:8000"
+    # Secrets are read from .env at RUN time; they are never baked into the image.
+    env_file:
+      - .env
+    environment:
+      LOG_FORMAT: json
+      LOG_LEVEL: INFO
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
