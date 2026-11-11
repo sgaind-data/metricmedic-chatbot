@@ -1,4 +1,4 @@
-"""High-level entry point used by Streamlit now and FastAPI/MCP later."""
+"""High-level entry point used by Streamlit, the CLI, FastAPI and (later) MCP."""
 
 import logging
 import time
@@ -9,6 +9,7 @@ from metricmedic.chain import build_rag_chain
 from metricmedic.config import DEFAULT_TOP_K
 from metricmedic.lc_retriever import MetricMedicLCRetriever
 from metricmedic.retriever import MetricMedicRetriever
+from metricmedic.tracing import build_trace_config, merge_configs
 
 logger = logging.getLogger("metricmedic.pipeline")
 
@@ -18,7 +19,7 @@ MIN_TOP_K, MAX_TOP_K = 1, 10
 
 class InvalidQueryError(ValueError):
     """Raised for empty/oversized questions or out-of-range top_k.
-    FastAPI (Milestone 2) will turn this into an HTTP 422."""
+    FastAPI turns this into an HTTP 422."""
 
 
 def validate_request(query: str, top_k: int) -> str:
@@ -33,7 +34,7 @@ def validate_request(query: str, top_k: int) -> str:
 
 
 class MetricMedicRAG:
-    """Retrieval + grounded generation. Drop-in replacement for rag_chatbot.MetricMedicRAG."""
+    """Retrieval + grounded generation."""
 
     def __init__(self, retriever: MetricMedicRetriever | None = None, llm: Runnable | None = None):
         self.retriever = retriever or MetricMedicRetriever()
@@ -56,15 +57,34 @@ class MetricMedicRAG:
             self._chains[top_k] = build_rag_chain(lc_retriever, self.llm)
         return self._chains[top_k]
 
-    def answer(self, query: str, top_k: int = DEFAULT_TOP_K, config: dict | None = None) -> dict:
+    def answer(
+        self,
+        query: str,
+        top_k: int = DEFAULT_TOP_K,
+        config: dict | None = None,
+        *,
+        session_id: str | None = None,
+        user_id: str | None = None,
+        tags: list[str] | None = None,
+        trace_metadata: dict | None = None,
+    ) -> dict:
         """Return {"answer": str, "sources": list[dict], "used_fallback": bool}.
 
-        `config` is passed through to LangChain (Milestone 3 will put the
-        Langfuse callback handler here).
+        session_id / user_id / tags / trace_metadata are attached to the Langfuse
+        trace when tracing is enabled, and ignored otherwise.
         """
         query = validate_request(query, top_k)
+
+        run_config = build_trace_config(
+            session_id=session_id,
+            user_id=user_id,
+            tags=tags,
+            metadata={"top_k": top_k, **(trace_metadata or {})},
+        )
+        run_config = merge_configs(run_config, config)
+
         start = time.perf_counter()
-        result = self.get_chain(top_k).invoke(query, config=config)
+        result = self.get_chain(top_k).invoke(query, config=run_config or None)
         latency_ms = round((time.perf_counter() - start) * 1000, 1)
 
         # Log sizes and timings, never the question text itself (it may contain
