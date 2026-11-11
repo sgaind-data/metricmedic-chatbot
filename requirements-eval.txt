@@ -1,0 +1,6 @@
+# Offline evaluation only. Not installed in the API Docker image.
+-r requirements-dev.txt
+ragas
+langchain-ollama
+# ragas 0.4.x imports langchain_community.chat_models.vertexai, removed in 0.4.2+.
+langchain-community<0.4.2
