@@ -83,10 +83,17 @@ flowchart LR
 
 ## Results
 
-All numbers are real outputs from `evals/`, measured on the 40-question golden dataset
-(35 single-scenario, 1 ambiguous, 1 multi-scenario, 3 out-of-scope).
+All numbers are real outputs from `evals/`, and each one names the file it comes from. The golden dataset
+has 40 questions (35 single-scenario, 1 ambiguous, 1 multi-scenario, 3 out-of-scope). Quality metrics are
+scored on the **37 in-scope** questions; the 3 out-of-scope ones test the decline threshold.
 
-### Retrieval (deterministic, no LLM)
+| Layer | Result | Source |
+|---|---|---|
+| Retrieval (37 questions) | hit@3 0.838 · MRR 0.719 | `evals/results/retrieval_report.md` |
+| Answer quality (RAGAS, 37 questions) | faithfulness 0.746 · context recall 0.743 · answer relevancy 0.532 | `evals/results/ragas_report.md` |
+| Latency and cost (Langfuse, 60 requests) | p50 1,446 ms · p95 2,554 ms · ~727 tokens and $0.0005 per query at list price | `evals/results/langfuse_bench_bench-20261111-1733.json` |
+
+### Retrieval (deterministic, no LLM, 37 in-scope questions)
 
 | Metric | Score |
 |---|---|
@@ -122,17 +129,22 @@ Answers come from Gemini 3.1 Flash-Lite. The judge is a local `qwen2.5:7b` model
   bias of using an LLM as the judge, not a sign of off-topic answers.
 - **All 3 out-of-scope questions were declined correctly.**
 
-### Latency and footprint
+### Latency, cost and footprint
+
+Measured from Langfuse traces, not local timers: 60 requests through the full pipeline with
+`python -m evals.langfuse_bench`, tag `bench-20261111-1733`, 0 fallbacks.
 
 | | Value |
 |---|---|
-| Retrieval (embed + FAISS) | ~90 ms |
-| End-to-end p50 (Flash-Lite) | 1.47 s |
-| End-to-end p95 (free tier) | 13.9 s |
-| Share of latency spent in the LLM | ~97% (from Langfuse traces) |
+| End-to-end p50 | 1,446 ms |
+| End-to-end p95 (nearest rank) | 2,554 ms |
+| Max | 83,166 ms (1 of 60 requests) |
+| Tokens per 100 queries | 72,737 (48,757 input / 23,980 output) |
+| Cost per 100 queries | $0.0482 at Gemini list price, as computed by Langfuse ($0 billed on the free tier) |
+| Retrieval (embed + FAISS) | ~90 ms in a sample trace |
 | Docker image | 528 MB compressed / 2.29 GB on disk |
 
-The p95 tail comes from free-tier queueing at Gemini, not from this service.
+The single 83 s request doesn't move p50 or p95, but it is why a request timeout is on the next-steps list.
 
 ---
 
@@ -208,6 +220,8 @@ pip install -r requirements-eval.txt
 python -m evals.retrieval_eval                 # free and deterministic
 python -m evals.generate_answers               # 37 Gemini calls, resumable, rate-limit aware
 ollama pull qwen2.5:7b && python -m evals.ragas_eval
+python -m evals.langfuse_bench run --n 60      # 60 traced Gemini calls (needs Langfuse keys)
+python -m evals.langfuse_bench stats --tag bench-<from the run>   # p50 / p95 / tokens / cost
 ```
 
 - `evals/golden_dataset.jsonl` has 40 hand-checked questions written in user language (not copied from the KB),
@@ -285,6 +299,8 @@ Dockerfile, docker-compose.yml, .github/workflows/ci.yml
 - **Out-of-scope handling in the API.** The 0.25 threshold is applied in the MCP server. The next step is to apply it in
   the API pipeline too, to save an LLM call on off-topic questions.
 - **Eval tooling.** Migrate to the newer RAGAS metric API and add a stronger judge when one is available for free.
+- **Request timeout.** Cap the LLM call (and its retries) so a rare slow request falls back instead of
+  taking 83 s, as 1 of 60 benchmark requests did.
 
 ## License
 
