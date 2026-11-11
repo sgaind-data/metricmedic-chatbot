@@ -4,4 +4,4 @@ from metricmedic.pipeline import InvalidQueryError, MetricMedicRAG
 from metricmedic.retriever import MetricMedicRetriever
 
 __all__ = ["InvalidQueryError", "MetricMedicRAG", "MetricMedicRetriever"]
-__version__ = "0.4.0"
+__version__ = "0.5.0"

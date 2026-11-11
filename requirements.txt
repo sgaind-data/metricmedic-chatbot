@@ -2,3 +2,5 @@
 -r requirements-api.txt
 streamlit
 scikit-learn==1.5.1
+# MCP server for AI agents (v2 API: MCPServer)
+mcp[cli]>=2.3,<3
