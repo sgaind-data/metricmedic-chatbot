@@ -26,7 +26,7 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 
 # Check which models are free on your project in Google AI Studio
 # (Dashboard -> Rate limits) and set GEMINI_MODEL in .env if this one isn't.
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
 GEMINI_TEMPERATURE = float(os.getenv("GEMINI_TEMPERATURE", "0.2"))
 
 DEFAULT_TOP_K = int(os.getenv("METRICMEDIC_TOP_K", "3"))
