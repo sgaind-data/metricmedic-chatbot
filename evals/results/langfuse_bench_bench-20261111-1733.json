@@ -1,0 +1,12 @@
+{
+  "tag": "bench-20261111-1733",
+  "traces": 60,
+  "gemini_calls": 60,
+  "p50_ms": 1446,
+  "p95_ms": 2554,
+  "max_ms": 83166,
+  "tokens_in_per_100": 48757,
+  "tokens_out_per_100": 23980,
+  "tokens_total_per_100": 72737,
+  "langfuse_cost_usd_per_100": 0.0482
+}
