@@ -1,300 +1,291 @@
-# MetricMedic 🩺📊
+# MetricMedic: RAG API with Tracing, Evals and MCP
 
-MetricMedic is a RAG-powered troubleshooting assistant designed for students and junior data analysts who encounter mismatched metrics across SQL queries, dashboards, ETL pipelines, KPIs, and business reports.
+[![CI](https://github.com/sgaind-data/metricmedic-chatbot/actions/workflows/ci.yml/badge.svg)](https://github.com/sgaind-data/metricmedic-chatbot/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.12-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-It combines semantic embeddings, FAISS vector search, a structured analytics knowledge base, and Gemini to retrieve relevant troubleshooting context and generate grounded diagnostic guidance through an interactive Streamlit chat interface.
+MetricMedic is a retrieval-augmented assistant that diagnoses **data and metric problems**
+(revenue mismatches, double counting, row explosions after joins, timezone drift, and similar).
+It answers from a curated knowledge base of 51 troubleshooting scenarios, cites its sources,
+and declines questions outside that scope.
 
-## Features
+This project takes it from a Streamlit prototype to a production-style service:
 
-- Natural-language troubleshooting for SQL, dashboards, KPIs, ETL, and data-quality issues
-- Semantic retrieval using Sentence Transformers
-- FAISS vector similarity search
-- Gemini-powered grounded response generation
-- Structured JSON troubleshooting knowledge base
-- Retrieval transparency with similarity scores
-- Persistent chat history using SQLite
-- New Chat and previous-chat navigation
-- Automatic chat titles
-- Delete saved conversations
-- Fallback response if Gemini is temporarily unavailable
-- Automated retrieval tests with pytest
-- Streamlit conversational interface
+| Area | What it has |
+|---|---|
+| **RAG core** | Python package, FAISS cosine search over MiniLM embeddings, LangChain retriever + LCEL chain with a deterministic fallback |
+| **API** | FastAPI (`/ask`, `/health`), input validation, request IDs, structured JSON logs |
+| **Deployment** | Multi-stage Docker image (CPU-only torch, model baked in, non-root, healthcheck) and docker compose |
+| **Observability** | Langfuse tracing of every request: retrieval and LLM spans, latency, tokens, sessions, tags |
+| **Evaluation** | 40-question golden dataset, retrieval metrics (hit@k, MRR) and RAGAS answer-quality scores |
+| **Agent access** | MCP server exposing the retriever and the full pipeline to Claude Desktop or any MCP client |
+| **CI** | GitHub Actions: pre-commit lint, 44 tests, a retrieval quality gate, a Docker build and an optional live LLM smoke test |
 
-## Tech Stack
+Everything runs on free tiers: the Gemini API free tier, Langfuse Cloud Hobby, a local Ollama judge for evals,
+and GitHub Actions on a public repo.
 
-- Python
-- Streamlit
-- Sentence Transformers
-- FAISS
-- Google Gemini
-- SQLite
-- JSON
-- pytest
+---
 
 ## Architecture
 
-```text
-User Question
-      ↓
-SentenceTransformer Embedding
-      ↓
-FAISS Vector Search
-      ↓
-Top-K Troubleshooting Context
-      ↓
-Grounded Prompt
-      ↓
-Gemini
-      ↓
-Generated Troubleshooting Answer
+```mermaid
+flowchart LR
+    subgraph Clients
+        U1[curl / web client]
+        U2[Streamlit UI]
+        U3[Claude Desktop<br/>MCP client]
+        U4[CLI]
+    end
+
+    subgraph Service["metricmedic package"]
+        API[FastAPI<br/>/ask · /health]
+        MCP[MCP server<br/>stdio]
+        RAG[MetricMedicRAG<br/>validation · logging]
+        CHAIN[LCEL chain<br/>retrieve → prompt → LLM]
+        RET[Retriever<br/>MiniLM + FAISS]
+        FB[Fallback<br/>top KB match]
+    end
+
+    KB[(51-scenario<br/>knowledge base)]
+    GEM[Gemini<br/>3.1 Flash-Lite]
+    LF[Langfuse<br/>traces]
+
+    U1 --> API
+    U2 --> RAG
+    U3 --> MCP
+    U4 --> RAG
+    API --> RAG
+    MCP --> RET
+    MCP --> RAG
+    RAG --> CHAIN
+    CHAIN --> RET
+    RET --> KB
+    CHAIN --> GEM
+    CHAIN -. on error .-> FB
+    CHAIN -. callback .-> LF
 ```
 
-If Gemini is temporarily unavailable, MetricMedic falls back to a deterministic response based on the retrieved troubleshooting context.
+**Request flow:** the question is validated (1–2000 characters, top_k 1–10) → embedded with
+`all-MiniLM-L6-v2` → the top-k scenarios are found by cosine similarity in FAISS → they are formatted into a
+grounded prompt → Gemini writes the answer → the answer comes back with its sources. If Gemini fails
+(a rate limit or an outage), the chain falls back to the best knowledge-base match instead of returning an
+error, and logs a warning.
 
-## Project Structure
-
-```text
-metricmedic-chatbot/
-├── app.py
-├── chat_store.py
-├── llm.py
-├── rag.py
-├── rag_chatbot.py
-├── data/
-│   └── troubleshooting_guide.json
-├── tests/
-│   └── test_rag.py
-├── .env.example
-├── .gitignore
-├── LICENSE
-├── README.md
-└── requirements.txt
+```mermaid
+flowchart LR
+    subgraph CI["GitHub Actions (every PR)"]
+        L[Lint<br/>pre-commit] --- T[pytest 44 tests<br/>+ retrieval gate] --- D[docker build]
+    end
+    T -- main only, if secret set --> S[Live Gemini<br/>smoke test]
 ```
 
-## How It Works
+---
 
-### 1. Semantic Retrieval
+## Results
 
-MetricMedic loads troubleshooting scenarios from:
+All numbers are real outputs from `evals/`, measured on the 40-question golden dataset
+(35 single-scenario, 1 ambiguous, 1 multi-scenario, 3 out-of-scope).
 
-```text
-data/troubleshooting_guide.json
-```
+### Retrieval (deterministic, no LLM)
 
-Each scenario contains an issue description, keywords, and recommended diagnostic guidance.
+| Metric | Score |
+|---|---|
+| hit@1 | 0.595 |
+| **hit@3** | **0.838** |
+| hit@5 | 0.892 |
+| MRR | 0.719 |
+| recall@3 | 0.550 |
+| In-scope top-1 similarity (min / mean) | 0.333 / 0.522 |
+| Out-of-scope top-1 similarity (max) | 0.142 |
 
-The content is converted into semantic embeddings using a Sentence Transformer model.
+The gap between in-scope (≥ 0.333) and out-of-scope (≤ 0.142) similarity is what sets the **0.25
+out-of-scope threshold** used by the MCP server. CI fails if that gap ever closes.
 
-### 2. FAISS Vector Search
+### Answer quality (RAGAS, 37 in-scope questions)
 
-The user's question is embedded using the same model.
+Answers come from Gemini 3.1 Flash-Lite. The judge is a local `qwen2.5:7b` model running in Ollama.
 
-FAISS compares the query embedding with the troubleshooting knowledge base and retrieves the most relevant scenarios using vector similarity.
+| Metric | Score | What it measures |
+|---|---|---|
+| Faithfulness | 0.746 | Are the answer's claims supported by the retrieved context? |
+| Context recall | 0.743 | Does the retrieved context contain what the reference answer needs? |
+| Context precision | 0.541 | Is the relevant context ranked near the top? |
+| Answer relevancy | 0.532 | Does the answer address the question? |
 
-### 3. Retrieval-Augmented Generation
+**What the numbers say:**
+- **Retrieval is the bottleneck.** The lowest-faithfulness answers (q17, q19, q22) are the same questions
+  retrieval missed. When users describe a symptom ("my totals doubled") and the knowledge base uses jargon
+  ("many-to-many join fan-out"), the right scenario doesn't reach the top 3, and the LLM then has nothing
+  correct to ground on.
+- **Answer relevancy is understated.** Its distribution is bimodal, with 9 exact zeros. RAGAS gives a
+  zero when the judge reads hedged wording ("likely", "check whether") as noncommittal. This is a known
+  bias of using an LLM as the judge, not a sign of off-topic answers.
+- **All 3 out-of-scope questions were declined correctly.**
 
-The top retrieved scenarios are passed to Gemini as grounded context.
+### Latency and footprint
 
-Gemini generates a concise response containing:
+| | Value |
+|---|---|
+| Retrieval (embed + FAISS) | ~90 ms |
+| End-to-end p50 (Flash-Lite) | 1.47 s |
+| End-to-end p95 (free tier) | 13.9 s |
+| Share of latency spent in the LLM | ~97% (from Langfuse traces) |
+| Docker image | 528 MB compressed / 2.29 GB on disk |
 
-- the likely issue
-- recommended diagnostic checks
-- an explanation of why the issue may be happening
+The p95 tail comes from free-tier queueing at Gemini, not from this service.
 
-The model is instructed to rely on the retrieved troubleshooting context rather than inventing unsupported details.
+---
 
-### 4. Persistent Chat History
+## Quickstart
 
-MetricMedic stores conversations locally using SQLite.
-
-Users can:
-
-- start a new chat
-- reopen previous conversations
-- maintain chat history between sessions
-- automatically title conversations from the first question
-- delete saved chats
-
-The local database is excluded from GitHub.
-
-## Prerequisites
-
-Before running MetricMedic, make sure you have:
-
-- Python 3.10 or later
-- pip
-- Git
-- Gemini API key
-
-## Installation
-
-Clone the repository:
+**Requirements:** Python 3.12, plus a free Gemini API key from [Google AI Studio](https://aistudio.google.com/)
+(no card needed).
 
 ```bash
 git clone https://github.com/sgaind-data/metricmedic-chatbot.git
 cd metricmedic-chatbot
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt && pip install -e .
+cp .env.example .env          # then add GEMINI_API_KEY (Langfuse keys are optional)
 ```
-
-Create a virtual environment:
 
 ```bash
-python3 -m venv .venv
+python -m metricmedic "Why does my revenue not match finance?"   # CLI
+uvicorn metricmedic.api.main:app --reload                         # API on :8000
+streamlit run app.py                                              # chat UI
+pytest -q                                                         # 44 tests, no API calls
 ```
 
-Activate the virtual environment on macOS/Linux:
+### API
 
 ```bash
-source .venv/bin/activate
+curl -s localhost:8000/health
+curl -s -X POST localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question": "My row count exploded after a join", "top_k": 3}'
 ```
 
-Install the required dependencies:
+```json
+{
+  "answer": "Likely issue: Many-to-many join ...",
+  "sources": [{"issue": "Many-to-many join causing duplicates", "score": 0.69, "...": "..."}],
+  "used_fallback": false
+}
+```
+
+Every response carries an `X-Request-ID` header. The ID also appears in the logs and in the Langfuse trace,
+so one request can be followed end to end. Invalid input returns `422`. Unexpected errors return a generic
+`500` with the request ID and never a stack trace.
+
+### Docker
 
 ```bash
-pip install -r requirements.txt
+docker compose up --build        # serves on localhost:8000, reads .env at runtime
 ```
 
-## Configure Gemini
+- Multi-stage build with CPU-only PyTorch, which keeps the image far smaller than with CUDA wheels.
+- The embedding model is baked in at build time and loaded with `HF_HUB_OFFLINE=1`, so there are no
+  downloads at startup.
+- It runs as a non-root `appuser`, has a `HEALTHCHECK` on `/health`, and is limited to 2 GB of memory in compose.
+- Secrets are never baked into the image. `.env` is excluded by `.dockerignore` and injected at runtime.
 
-A template environment file is included:
+---
 
-```text
-.env.example
-```
+## Observability (Langfuse)
 
-Create your own `.env` file in the project root:
+Add `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` and `LANGFUSE_BASE_URL` to `.env`. Every request is then
+traced as a tree of spans: retriever → prompt → Gemini, with latency, token counts, and the model name.
 
-```text
-GEMINI_API_KEY=your_actual_gemini_api_key
-```
+- **Tags** identify the entry point: `api`, `cli`, `streamlit`, `mcp`, `eval`, `ci-smoke`.
+- **Sessions** group a Streamlit conversation (`chat-<id>`), or a caller-supplied `session_id` on `/ask`.
+- **Metadata** carries the request ID, so a log line and its trace can be joined.
+- Tracing is optional. With no keys, or with `LANGFUSE_TRACING_ENABLED=false` (as in tests and CI), it is a no-op.
 
-Do not commit your `.env` file or API key to GitHub.
-
-## Run MetricMedic
-
-Start the Streamlit application:
+## Evaluation
 
 ```bash
-streamlit run app.py
+pip install -r requirements-eval.txt
+python -m evals.retrieval_eval                 # free and deterministic
+python -m evals.generate_answers               # 37 Gemini calls, resumable, rate-limit aware
+ollama pull qwen2.5:7b && python -m evals.ragas_eval
 ```
 
-The application usually opens at:
+- `evals/golden_dataset.jsonl` has 40 hand-checked questions written in user language (not copied from the KB),
+  covering all 51 scenarios, plus ambiguous, multi-scenario and out-of-scope cases.
+- Reports are written to `evals/results/` as both JSON and Markdown.
+- The golden set is used **only for measurement**. Nothing was tuned against it, to avoid data leakage.
 
-```text
-http://localhost:8501
-```
+## MCP server
 
-## Example Questions
+The retriever is exposed as a [Model Context Protocol](https://modelcontextprotocol.io) server, so an agent
+such as Claude Desktop can call it as a tool.
 
-Try prompts such as:
-
-```text
-My dashboard customer count doubled after joining two tables.
-```
-
-```text
-Finance says revenue is different from Power BI.
-```
-
-```text
-My dashboard is still showing yesterday's data.
-```
-
-```text
-Why did records disappear after an INNER JOIN?
-```
-
-```text
-My conversion rate is above 100%.
-```
-
-```text
-My historical dashboard numbers changed from last month.
-```
-
-## Example Retrieval Flow
-
-For a question such as:
-
-```text
-My dashboard customer count doubled after joining two tables.
-```
-
-MetricMedic may retrieve scenarios related to:
-
-```text
-Dashboard total is higher than the source system
-COUNT and COUNT DISTINCT mismatch
-Many-to-many join causing row explosion
-```
-
-Gemini then combines the retrieved troubleshooting context into a grounded response.
-
-Users can expand the **Retrieved troubleshooting context** section in the interface to inspect the supporting issues and similarity scores.
-
-## Testing
-
-Run the automated test suite with:
+| Type | Name | Purpose |
+|---|---|---|
+| Tool | `search_troubleshooting_kb` | Raw top-k KB matches with scores and an `in_scope` flag. No LLM call, no cost. |
+| Tool | `ask_metricmedic` | The full RAG answer. Declines without calling the LLM when the question is out of scope. |
+| Resource | `metricmedic://issues` | The list of all 51 issues the KB covers |
 
 ```bash
-pytest
+metricmedic-mcp                               # stdio (for Claude Desktop)
+npx @modelcontextprotocol/inspector metricmedic-mcp   # interactive testing
 ```
 
-The tests validate:
-
-- knowledge-base loading
-- FAISS index creation
-- semantic retrieval
-- join-problem retrieval
-- stale-dashboard retrieval
-- revenue-mismatch retrieval
-
-Gemini is not called during unit tests, which keeps the tests deterministic and avoids failures caused by temporary API availability.
-
-## Knowledge Base Coverage
-
-MetricMedic includes troubleshooting scenarios related to:
-
-- duplicate records
-- SQL joins
-- NULL handling
-- COUNT vs. COUNT DISTINCT
-- date filters
-- stale dashboards
-- Power BI DAX context
-- revenue reconciliation
-- ETL failures
-- incremental loads
-- late-arriving data
-- KPI definitions
-- aggregation grain
-- row-level security
-- currency conversion
-- historical data changes
-- slowly changing dimensions
-- fact and dimension table issues
-
-New troubleshooting scenarios can be added directly to:
-
-```text
-data/troubleshooting_guide.json
+Claude Desktop config (`claude_desktop_config.json`):
+```json
+{ "mcpServers": { "metricmedic": { "command": "/absolute/path/to/.venv/bin/metricmedic-mcp" } } }
 ```
 
-## Security
+## CI (GitHub Actions)
 
-Sensitive or local-only files are excluded using `.gitignore`, including:
+| Job | Runs on | What it checks |
+|---|---|---|
+| Lint | every PR and push | 9 pre-commit hooks: ruff lint + format, YAML/TOML checks, large files, private keys |
+| Tests + retrieval gate | every PR and push | 44 pytest tests with fake LLMs (no API calls), then `evals.smoke --retrieval` |
+| Docker | every PR and push | The production image still builds |
+| Live smoke test | `main` / manual only | 3 real questions through Gemini, only if the `GEMINI_API_KEY` secret is set |
 
-```text
-.env
-metricmedic_chats.db
-.venv/
-__pycache__/
-.pytest_cache/
+The **retrieval quality gate** fails the build if hit@3 drops below 0.80 or MRR below 0.65 (the baseline
+minus a margin), or if the 0.25 out-of-scope threshold stops separating in-scope from out-of-scope questions.
+A change that quietly makes retrieval worse cannot be merged.
+
+---
+
+## Project layout
+
+```
+metricmedic/            core package
+  retriever.py          MiniLM + FAISS, embedding cache
+  lc_retriever.py       LangChain BaseRetriever adapter
+  chain.py, prompts.py  LCEL chain, grounded prompt, fallback
+  pipeline.py           MetricMedicRAG: validation, tracing, logging
+  tracing.py            Langfuse handler, sessions, tags, flush
+  api/                  FastAPI app and schemas
+  mcp_server.py         MCP tools and resource
+evals/                  golden dataset, retrieval + RAGAS evals, CI smoke test
+tests/                  44 tests (unit, chain, API, tracing, dataset, MCP)
+Dockerfile, docker-compose.yml, .github/workflows/ci.yml
 ```
 
-The repository includes `.env.example` so other users know which environment variable is required without exposing the real Gemini API key.
+## Design decisions
+
+- **Embeddings run locally (MiniLM), with a hosted LLM.** Retrieval is free, fast (~90 ms) and deterministic, which is what
+  makes the CI quality gate possible. Only generation uses an API.
+- **The chain falls back instead of failing.** On a free tier, rate limits are normal. The user still gets the most relevant
+  KB guidance, flagged with `used_fallback: true`, and the failure is logged and traced.
+- **The prompt is sent as a single human message.** Gemini's v1 API rejects system instructions. A regression test locks this in.
+- **The LLM judge runs locally.** RAGAS needs hundreds of judge calls, which a 500-requests-per-day free tier can't cover.
+  A local 7B judge is free and repeatable, but noisier than a frontier model, so its scores are best read as relative.
+- **Question text is never logged.** Only lengths, latency, and request IDs, in case user questions contain sensitive data.
+
+## Limitations and next steps
+
+- **Retrieval recall.** Add hybrid search (BM25 + embeddings) or a cross-encoder reranker to close the gap between
+  symptom wording and KB jargon (q10, q17, q19, q22, q27 and q30 currently miss).
+- **Out-of-scope handling in the API.** The 0.25 threshold is applied in the MCP server. The next step is to apply it in
+  the API pipeline too, to save an LLM call on off-topic questions.
+- **Eval tooling.** Migrate to the newer RAGAS metric API and add a stronger judge when one is available for free.
 
 ## License
 
-This project is licensed under the MIT License.
-
-See the `LICENSE` file for details.
+MIT

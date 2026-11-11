@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "metricmedic"
-version = "0.5.0"
+version = "1.0.0"
 description = "RAG API, tracing & evals for SQL/dashboard/KPI/ETL troubleshooting"
 requires-python = ">=3.10"
 license = "MIT"

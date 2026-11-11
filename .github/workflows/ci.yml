@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: # "Run workflow" button in the Actions tab
+
+# Cancel an older run of the same branch when a new commit arrives.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  # Tests must never send traces or need secrets.
+  LANGFUSE_TRACING_ENABLED: "false"
+
+jobs:
+  lint:
+    name: Lint (pre-commit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install pre-commit
+      - run: pre-commit run --all-files --show-diff-on-failure
+
+  test:
+    name: Tests + retrieval quality gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: Cache Hugging Face embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-all-MiniLM-L6-v2
+
+      - name: Install dependencies (CPU-only PyTorch first)
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements-dev.txt
+          pip install -e .
+
+      - name: Unit, API and MCP tests (no API calls)
+        run: pytest -q
+
+      - name: Retrieval quality gate (no LLM)
+        run: python -m evals.smoke --retrieval
+
+  llm-smoke:
+    name: Live Gemini smoke test (3 questions)
+    needs: test
+    # Only on main or a manual run, and only if the secret exists. Forks never get secrets.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - name: Skip when no API key is configured
+        if: env.GEMINI_API_KEY == ''
+        run: echo "GEMINI_API_KEY secret not set - skipping live smoke test."
+      - uses: actions/checkout@v5
+        if: env.GEMINI_API_KEY != ''
+      - uses: actions/setup-python@v6
+        if: env.GEMINI_API_KEY != ''
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - uses: actions/cache@v4
+        if: env.GEMINI_API_KEY != ''
+        with:
+          path: ~/.cache/huggingface
+          key: hf-all-MiniLM-L6-v2
+      - name: Install
+        if: env.GEMINI_API_KEY != ''
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          pip install -e .
+      - name: 3 live questions through the full pipeline
+        if: env.GEMINI_API_KEY != ''
+        run: python -m evals.smoke --llm 3
+
+  docker:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build (no push)
+        run: docker build -t metricmedic-api:ci .
