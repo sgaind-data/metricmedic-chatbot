@@ -129,6 +129,25 @@ Answers come from Gemini 3.1 Flash-Lite. The judge is a local `qwen2.5:7b` model
   bias of using an LLM as the judge, not a sign of off-topic answers.
 - **All 3 out-of-scope questions were declined correctly.**
 
+### Experiment: hybrid retrieval (BM25 + dense, RRF), not adopted
+
+All 6 retrieval misses were vocabulary gaps, so I tested hybrid search: BM25 keyword scores fused with the
+dense ranking by Reciprocal Rank Fusion (`metricmedic/hybrid.py`). Parameters were standard defaults fixed
+before the run (BM25 k1=1.2, b=0.75; RRF k=60), and the adoption rule was written down first: hit@3 and
+MRR must both improve, with no previously correct question lost.
+
+| Metric (37 questions) | Dense (kept) | Hybrid | Change |
+|---|---|---|---|
+| hit@1 | 0.595 | 0.568 | -0.027 |
+| hit@3 | 0.838 | 0.865 | +0.027 |
+| recall@3 | 0.550 | 0.606 | +0.056 |
+| MRR | 0.719 | 0.714 | -0.005 |
+
+Hybrid fixed q17 and q22 but broke q11, and ranked the right answer first less often. On 37 questions,
+one question is 2.7 points, so the hit@3 gain is a net of one question. Under the pre-registered rule,
+**dense retrieval stays**. Source: `evals/results/retrieval_comparison.md`
+(`python -m evals.compare_retrieval`). Next: a cross-encoder reranker, judged on a larger held-out set.
+
 ### Latency, cost and footprint
 
 Measured from Langfuse traces, not local timers: 60 requests through the full pipeline with
@@ -294,8 +313,9 @@ Dockerfile, docker-compose.yml, .github/workflows/ci.yml
 
 ## Limitations and next steps
 
-- **Retrieval recall.** Add hybrid search (BM25 + embeddings) or a cross-encoder reranker to close the gap between
-  symptom wording and KB jargon (q10, q17, q19, q22, q27 and q30 currently miss).
+- **Retrieval recall.** Hybrid BM25 + dense was tested and not adopted (see Results). Next is a cross-encoder
+  reranker, judged on a larger held-out question set, for the gap between symptom wording and KB jargon
+  (q10, q17, q19, q22, q27 and q30 currently miss).
 - **Out-of-scope handling in the API.** The 0.25 threshold is applied in the MCP server. The next step is to apply it in
   the API pipeline too, to save an LLM call on off-topic questions.
 - **Eval tooling.** Migrate to the newer RAGAS metric API and add a stronger judge when one is available for free.

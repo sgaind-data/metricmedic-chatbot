@@ -1,0 +1,34 @@
+{
+  "run": "2026-11-11T23:51:32+00:00",
+  "questions": 37,
+  "dense": {
+    "hit@1": 0.595,
+    "hit@3": 0.838,
+    "hit@5": 0.892,
+    "mrr": 0.719,
+    "recall@3": 0.55
+  },
+  "hybrid": {
+    "hit@1": 0.568,
+    "hit@3": 0.865,
+    "hit@5": 0.892,
+    "mrr": 0.714,
+    "recall@3": 0.606
+  },
+  "fixed_at_3": [
+    "q17",
+    "q22"
+  ],
+  "broken_at_3": [
+    "q11"
+  ],
+  "threshold_still_separates": true,
+  "decision": "keep dense",
+  "hybrid_misses_at_3": [
+    "q10",
+    "q11",
+    "q19",
+    "q27",
+    "q30"
+  ]
+}
