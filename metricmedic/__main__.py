@@ -5,12 +5,17 @@ import sys
 
 from metricmedic import MetricMedicRAG
 from metricmedic.logging_config import setup_logging
+from metricmedic.tracing import flush_traces
 
 
 def main():
     setup_logging()
     query = " ".join(sys.argv[1:]) or "My dashboard customer count doubled after joining two tables"
-    result = MetricMedicRAG().answer(query)
+    try:
+        result = MetricMedicRAG().answer(query, tags=["cli"])
+    finally:
+        # Short-lived script: send buffered traces before Python exits.
+        flush_traces()
     print("\nAnswer:\n")
     print(result["answer"])
     print(f"\nUsed fallback: {result['used_fallback']}")

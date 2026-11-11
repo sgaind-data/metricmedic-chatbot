@@ -203,7 +203,11 @@ if user_input:
     with st.chat_message("assistant"):
         with st.spinner("Retrieving relevant context and analyzing your issue..."):
             try:
-                result = chatbot.answer(user_input)
+                result = chatbot.answer(
+                    user_input,
+                    session_id=f"chat-{active_chat_id}",
+                    tags=["streamlit"],
+                )
 
                 answer = result["answer"]
                 sources = result["sources"]

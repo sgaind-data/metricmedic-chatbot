@@ -19,6 +19,11 @@ class AskRequest(BaseModel):
         le=MAX_TOP_K,
         description="How many knowledge-base scenarios to retrieve.",
     )
+    session_id: str | None = Field(
+        None,
+        max_length=128,
+        description="Optional conversation ID; groups related questions in Langfuse.",
+    )
 
 
 class Source(BaseModel):

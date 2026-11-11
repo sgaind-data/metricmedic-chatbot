@@ -16,6 +16,7 @@ from metricmedic import __version__
 from metricmedic.api.schemas import AskRequest, AskResponse, ErrorResponse, HealthResponse
 from metricmedic.logging_config import setup_logging
 from metricmedic.pipeline import InvalidQueryError, MetricMedicRAG
+from metricmedic.tracing import flush_traces, get_langfuse_handler
 
 logger = logging.getLogger("metricmedic.api")
 
@@ -28,8 +29,10 @@ def create_app(rag: MetricMedicRAG | None = None) -> FastAPI:
         setup_logging()
         # Load the embedding model + FAISS index ONCE at startup, not per request.
         app.state.rag = rag or MetricMedicRAG()
+        get_langfuse_handler()  # logs whether tracing is enabled
         logger.info("API started (version %s)", __version__, extra={"event": "api_startup"})
         yield
+        flush_traces()  # don't lose buffered traces on shutdown
         logger.info("API shutting down", extra={"event": "api_shutdown"})
 
     app = FastAPI(
@@ -88,7 +91,13 @@ def create_app(rag: MetricMedicRAG | None = None) -> FastAPI:
         # Plain `def` (not async): the chain is blocking, so FastAPI runs it in a
         # worker thread and the server keeps accepting other requests.
         start = time.perf_counter()
-        result = rag.answer(body.question, top_k=body.top_k)
+        result = rag.answer(
+            body.question,
+            top_k=body.top_k,
+            session_id=body.session_id,
+            tags=["api"],
+            trace_metadata={"request_id": request.state.request_id},
+        )
         return AskResponse(
             answer=result["answer"],
             sources=result["sources"],
