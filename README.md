@@ -19,7 +19,7 @@ This project takes it from a Streamlit prototype to a production-style service:
 | **Observability** | Langfuse tracing of every request: retrieval and LLM spans, latency, tokens, sessions, tags |
 | **Evaluation** | 40-question golden dataset, retrieval metrics (hit@k, MRR) and RAGAS answer-quality scores |
 | **Agent access** | MCP server exposing the retriever and the full pipeline to Claude Desktop or any MCP client |
-| **CI** | GitHub Actions: pre-commit lint, 44 tests, a retrieval quality gate, a Docker build and an optional live LLM smoke test |
+| **CI** | GitHub Actions: pre-commit lint, 49 tests, a retrieval quality gate, a Docker build and a live LLM smoke test on `main` |
 
 Everything runs on free tiers: the Gemini API free tier, Langfuse Cloud Hobby, a local Ollama judge for evals,
 and GitHub Actions on a public repo.
@@ -74,7 +74,7 @@ error, and logs a warning.
 ```mermaid
 flowchart LR
     subgraph CI["GitHub Actions (every PR)"]
-        L[Lint<br/>pre-commit] --- T[pytest 44 tests<br/>+ retrieval gate] --- D[docker build]
+        L[Lint<br/>pre-commit] --- T[pytest 49 tests<br/>+ retrieval gate] --- D[docker build]
     end
     T -- main only, if secret set --> S[Live Gemini<br/>smoke test]
 ```
@@ -184,7 +184,7 @@ cp .env.example .env          # then add GEMINI_API_KEY (Langfuse keys are optio
 python -m metricmedic "Why does my revenue not match finance?"   # CLI
 uvicorn metricmedic.api.main:app --reload                         # API on :8000
 streamlit run app.py                                              # chat UI
-pytest -q                                                         # 44 tests, no API calls
+pytest -q                                                         # 49 tests, no API calls
 ```
 
 ### API
@@ -274,7 +274,7 @@ Claude Desktop config (`claude_desktop_config.json`):
 | Job | Runs on | What it checks |
 |---|---|---|
 | Lint | every PR and push | 9 pre-commit hooks: ruff lint + format, YAML/TOML checks, large files, private keys |
-| Tests + retrieval gate | every PR and push | 44 pytest tests with fake LLMs (no API calls), then `evals.smoke --retrieval` |
+| Tests + retrieval gate | every PR and push | 49 pytest tests with fake LLMs (no API calls), then `evals.smoke --retrieval` |
 | Docker | every PR and push | The production image still builds |
 | Live smoke test | `main` / manual only | 3 real questions through Gemini, only if the `GEMINI_API_KEY` secret is set |
 
@@ -295,8 +295,10 @@ metricmedic/            core package
   tracing.py            Langfuse handler, sessions, tags, flush
   api/                  FastAPI app and schemas
   mcp_server.py         MCP tools and resource
-evals/                  golden dataset, retrieval + RAGAS evals, CI smoke test
-tests/                  44 tests (unit, chain, API, tracing, dataset, MCP)
+  hybrid.py             BM25 + dense RRF retriever (experiment, not adopted)
+evals/                  golden dataset, retrieval + RAGAS evals, Langfuse benchmark,
+                        hybrid comparison, CI smoke test
+tests/                  49 tests (unit, chain, API, tracing, dataset, MCP, hybrid)
 Dockerfile, docker-compose.yml, .github/workflows/ci.yml
 ```
 
